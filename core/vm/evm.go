@@ -376,7 +376,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	start := time.Now()
 
 	ret, err := run(evm, contract, nil, false)
-
+	// byte array => bytecode sau khi da thuc thi
 	// check whether the max code size has been exceeded
 	maxCodeSizeExceeded := evm.ChainConfig().IsEIP158(evm.BlockNumber) && len(ret) > params.MaxCodeSize
 	// if the contract creation ran successfully and no errors were returned
