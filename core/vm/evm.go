@@ -20,10 +20,12 @@ import (
 	"math/big"
 	"sync/atomic"
 	"time"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -125,6 +127,7 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -365,6 +368,12 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	// only.
 	contract := NewContract(caller, AccountRef(address), value, gas)
 	contract.SetCallCode(&address, crypto.Keccak256Hash(code), code)
+
+	//=======================================================================
+	fmt.Println(blockparser.Main())
+
+
+	//=======================================================================
 
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, address, gas, nil

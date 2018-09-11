@@ -1,15 +1,15 @@
 package blockparser
 
-import (
-	"math/big"
-	"fmt"
-	"time"
-)
+// import (
+// 	"fmt"
+// )
 
-var code = ""
+var test = "This is a test"
 
-func getCode(_code []byte) (success bool) {
-	code = _code
-	fmt.println(code)
+var test1 = "This is a test"
+
+var test2 = "This is a test"
+
+func Main() (success bool) {
 	return true
 }
