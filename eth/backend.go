@@ -49,6 +49,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 type LesServer interface {
@@ -92,6 +94,11 @@ type Ethereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+//==============================================================================
+// New custom DB when new Ethereum
+	evmLogDb *blockparser.EVMLogDb
+//==============================================================================
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
@@ -115,6 +122,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	}
 	// Assemble the Ethereum object
 	chainDb, err := CreateDB(ctx, config, "chaindata")
+	
+	
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +192,18 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	}
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
 
+//==============================================================================
+
+	// create new custom DB
+	customDb, err := CreateCustomDB(ctx, config, "customdata")
+	// create new EVMLogDB
+	eth.evmLogDb = blockparser.NewEVMLogDb(customDb)
+	eth.blockchain.SetEVMLogDb(eth.evmLogDb)
+	eth.evmLogDb.TestDb()
+	
+
+//==============================================================================
+
 	return eth, nil
 }
 
@@ -214,6 +235,22 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Data
 	}
 	return db, nil
 }
+//==============================================================================
+
+// CreateCustomDB creates the custom database.
+func CreateCustomDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Database, error) {
+	db, err := ctx.OpenDatabase(name, config.DatabaseCache, config.DatabaseHandles)
+	if err != nil {
+		return nil, err
+	}
+	if db, ok := db.(*ethdb.LDBDatabase); ok {
+		db.Meter("eth/db/customdata/")
+	}
+	return db, nil
+}
+
+//==============================================================================
+
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
 func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {

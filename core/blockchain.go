@@ -44,6 +44,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/hashicorp/golang-lru"
+
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 var (
@@ -129,6 +131,9 @@ type BlockChain struct {
 	vmConfig  vm.Config
 
 	badBlocks *lru.Cache // Bad block cache
+//===============================================================================
+	evmLogDb	*blockparser.EVMLogDb
+//===============================================================================
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -1580,3 +1585,9 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
 }
+
+//===============================================================================
+func (bc *BlockChain) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
+	bc.evmLogDb = evmLogDb
+}
+//===============================================================================

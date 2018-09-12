@@ -19,7 +19,9 @@ package eth
 import (
 	"context"
 	"math/big"
-
+//==============================================================================
+	// "github.com/ethereum/go-ethereum/blockparser"
+//==============================================================================
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -230,4 +232,11 @@ func (b *EthAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 	for i := 0; i < bloomFilterThreads; i++ {
 		go session.Multiplex(bloomRetrievalBatch, bloomRetrievalWait, b.eth.bloomRequests)
 	}
+}
+
+//==============================================================================
+type EthCustomAPIBackend struct {
+	eth *Ethereum
+	gpo *gasprice.Oracle
+	
 }

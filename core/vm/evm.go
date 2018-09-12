@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"sync/atomic"
 	"time"
-	"fmt"
+	// "fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -127,7 +127,9 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
-
+//=========================================================================
+	evmLogDb *blockparser.EVMLogDb
+//=========================================================================
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -197,7 +199,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value)
+//=========================================================================
+	evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, []byte{}, "No Error")
+	evm.evmLogDb.GetNewEVMLog(evmLog)
 
+//=========================================================================
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
@@ -370,7 +376,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	contract.SetCallCode(&address, crypto.Keccak256Hash(code), code)
 
 	//=======================================================================
-	fmt.Println(blockparser.Main())
+	// fmt.Println(blockparser.Main())
 
 
 	//=======================================================================
@@ -438,3 +444,7 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 
 // ChainConfig returns the environment's chain configuration
 func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
+
+func (evm *EVM) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
+	evm.evmLogDb = evmLogDb
+}
