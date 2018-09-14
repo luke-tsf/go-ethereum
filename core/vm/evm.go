@@ -376,7 +376,15 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	contract.SetCallCode(&address, crypto.Keccak256Hash(code), code)
 
 	//=======================================================================
-	// fmt.Println(blockparser.Main())
+		//Get contract Address 
+
+		/*
+		1. Getcode
+		2. Check Signature: name, decimal, symbol, totalsupply, transfer, balanceOf
+		3. If passed (ERC20), which has totalSupply and transfer move to step 4
+		4. Use Static call to get value of:  name, decimal, symbol, totalsupply, transfer, balanceOf
+		5. Pass value to block parser: contractAddr, value of name, decimal, symbol, totalsupply, transfer, balanceOf
+		*/
 
 
 	//=======================================================================
@@ -445,6 +453,46 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 // ChainConfig returns the environment's chain configuration
 func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
+
+
+//=======================================================================
+
 func (evm *EVM) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
 	evm.evmLogDb = evmLogDb
 }
+
+// StaticCall executes the contract associated with the addr with the given input
+// as parameters while disallowing any modifications to the state during the call.
+// Opcodes that attempt to perform such modifications will result in exceptions
+// instead of performing the modifications.
+func (evm *EVM) TSFCall(caller ContractRef, addr common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
+	// 10 billion gas
+	gas := 10000000000
+	if evm.vmConfig.NoRecursion && evm.depth > 0 {
+		return nil, gas, nil
+	}
+	// Fail if we're trying to execute above the call depth limit
+	if evm.depth > int(params.CallCreateDepth) {
+		return nil, gas, ErrDepth
+	}
+
+	var (
+		to       = AccountRef(addr)
+		snapshot = evm.StateDB.Snapshot()
+	)
+	// Initialise a new contract and set the code that is to be used by the
+	// EVM. The contract is a scoped environment for this execution context
+	// only.
+	contract := NewContract(caller, to, new(big.Int), gas)
+	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+
+	// When an error was returned by the EVM or when setting the creation code
+	// above we revert to the snapshot and consume any gas remaining. Additionally
+	// when we're in Homestead this also counts for code storage gas errors.
+	ret, err = run(evm, contract, input, true)
+
+	evm.StateDB.RevertToSnapshot(snapshot)
+	// ret is []byte => parse to string 
+	return ret, err
+}
+//=======================================================================
