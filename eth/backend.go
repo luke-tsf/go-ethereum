@@ -97,10 +97,17 @@ type Ethereum struct {
 
 //==============================================================================
 // New custom DB when new Ethereum
-	evmLogDb *blockparser.EVMLogDb
+	evmLogDb 	*blockparser.EVMLogDb
+// TSF API
+	tsfEthAPIBackend 		*TSFEthAPIBackend
 //==============================================================================
 }
-
+//==============================================================================
+// new pointer for TSF API
+type TSF struct {
+	evmLogDb 			*blockparser.EVMLogDb
+}
+//==============================================================================
 func (s *Ethereum) AddLesServer(ls LesServer) {
 	s.lesServer = ls
 	ls.SetBloomBitsIndexer(s.bloomIndexer)
@@ -201,6 +208,12 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	eth.blockchain.SetEVMLogDb(eth.evmLogDb)
 	eth.evmLogDb.TestDb()
 	
+	tsf := &TSF{
+		evmLogDb: eth.evmLogDb,
+	}
+	eth.tsfEthAPIBackend = &TSFEthAPIBackend{tsf}
+	// Create new TSFETHAPIBackend
+
 
 //==============================================================================
 
@@ -248,6 +261,7 @@ func CreateCustomDB(ctx *node.ServiceContext, config *Config, name string) (ethd
 	}
 	return db, nil
 }
+
 
 //==============================================================================
 
@@ -337,6 +351,13 @@ func (s *Ethereum) APIs() []rpc.API {
 			Service:   s.netRPCService,
 			Public:    true,
 		},
+		{
+			Namespace: "tsf",
+			Version:   "1.0",
+			// insert pointer TSFEthereumAPI
+			Service:   NewTSFEthereumAPI(s.tsfEthAPIBackend.tsf),
+			Public:    true,
+		}, 
 	}...)
 }
 

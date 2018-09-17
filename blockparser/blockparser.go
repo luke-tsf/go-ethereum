@@ -39,6 +39,7 @@ func (evmLogDb *EVMLogDb) GetNewEVMLogToken(evmLog *EVMLog) (bool){
 	fmt.Println("Value of Token", string(key), string(getValue))
 	return true
 }
+
 func (evmLogDb *EVMLogDb) TestDb() (bool){
 	key := []byte{'k','e','y'}
 	value := []byte{'v','a','l','u','e'}

@@ -477,7 +477,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 				valueUint := math.MustParseBig256(valueString)
 				result += string(valueString)
 				result += ","
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint), valueUint)
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
 			}
 		}
 		// Get Total Supply
@@ -487,7 +487,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 			if err == nil {
 				valueUint := math.MustParseBig256(valueString)
 				result += string(valueString)
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint), valueUint)
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
 			}
 		}
 		fmt.Println(result)

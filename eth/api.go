@@ -458,3 +458,15 @@ func (api *PrivateDebugAPI) getModifiedAccounts(startBlock, endBlock *types.Bloc
 	}
 	return dirty, nil
 }
+//==============================================================================
+// TSFEthereumAPI provides an API to access TSF Blockparser-related
+// information.
+type TSFEthereumAPI struct {
+	tsf *TSF
+}
+
+// NewTSFEthereumAPI creates a new TSF protocol API for blockparser
+func NewTSFEthereumAPI(tsf *TSF) *TSFEthereumAPI{
+	return &TSFEthereumAPI{tsf}
+}
+//==============================================================================
