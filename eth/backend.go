@@ -352,7 +352,7 @@ func (s *Ethereum) APIs() []rpc.API {
 			Public:    true,
 		},
 		{
-			Namespace: "tsf",
+			Namespace: "eth",
 			Version:   "1.0",
 			// insert pointer TSFEthereumAPI
 			Service:   NewTSFEthereumAPI(s.tsfEthAPIBackend.tsf),
