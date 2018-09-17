@@ -9,23 +9,24 @@ import (
 // ERROR
 
 type EVMLog struct {
-	sender 			common.Address
-	receiver 		common.Address
-	value			*big.Int
-	tokenERC20		[]byte
-	err 			string
+	sender 				common.Address
+	receiver 			common.Address
+	value				*big.Int
+	tokenERC20			common.Address
+	tokenInformation	string
+	err 				error
 }
-
 type EVMLogDb struct {
 	customDb		ethdb.Database
 }
-func NewEVMLog(_sender common.Address, _receiver common.Address, _value *big.Int, _tokenERC20 []byte, _err string) *EVMLog{
+func NewEVMLog(_sender common.Address, _receiver common.Address, _value *big.Int, _tokenERC20 common.Address, _tokenInformation string, _err error) *EVMLog{
 	return &EVMLog{
-		sender: 	_sender,
-		receiver:	_receiver,
-		value:		_value,
-		tokenERC20:	_tokenERC20,
-		err:		_err,
+		sender: 			_sender,
+		receiver:			_receiver,
+		value:				_value,
+		tokenERC20:			_tokenERC20,
+		tokenInformation:	_tokenInformation,
+		err:				_err,
 	}
 }
 

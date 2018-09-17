@@ -20,11 +20,16 @@ import (
 	"math/big"
 	"sync/atomic"
 	"time"
-	// "fmt"
+	"fmt"
+	"bytes"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
+
 	"github.com/ethereum/go-ethereum/blockparser"
 )
 
@@ -32,6 +37,16 @@ import (
 // deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
+//=======================================================================
+// transfer, balanceOf, totalSupply, 
+var erc20Basic = []string{"0xa9059cbb", "0x70a08231", "0x18160ddd"}
+// transferFrom, approve, allowance
+var erc20Standard = []string{"0x23b872dd", "0x095ea7b3", "0xdd62ed3e"}
+// name, symbol, decimals
+var erc20Detail = []string{"0x06fdde03", "0x95d89b41", "0x313ce567"}
+
+
+//=======================================================================
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc func(StateDB, common.Address, *big.Int) bool
@@ -166,6 +181,7 @@ func (evm *EVM) Interpreter() Interpreter {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
+	fmt.Println("Check call argument",caller, addr, input, gas, value)
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, gas, nil
 	}
@@ -200,8 +216,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value)
 //=========================================================================
-	evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, []byte{}, "No Error")
-	evm.evmLogDb.GetNewEVMLog(evmLog)
+	// evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, []byte{}, "No Error")
+	// evm.evmLogDb.GetNewEVMLog(evmLog)
 
 //=========================================================================
 	// Initialise a new contract and set the code that is to be used by the EVM.
@@ -375,19 +391,6 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	contract := NewContract(caller, AccountRef(address), value, gas)
 	contract.SetCallCode(&address, crypto.Keccak256Hash(code), code)
 
-	//=======================================================================
-		//Get contract Address 
-
-		/*
-		1. Getcode
-		2. Check Signature: name, decimal, symbol, totalsupply, transfer, balanceOf
-		3. If passed (ERC20), which has totalSupply and transfer move to step 4
-		4. Use Static call to get value of:  name, decimal, symbol, totalsupply, transfer, balanceOf
-		5. Pass value to block parser: contractAddr, value of name, decimal, symbol, totalsupply, transfer, balanceOf
-		*/
-
-
-	//=======================================================================
 
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, address, gas, nil
@@ -431,6 +434,69 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	if evm.vmConfig.Debug && evm.depth == 0 {
 		evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
 	}
+//=======================================================================
+		//Get contract Address 
+
+		/*
+		1. Getcode
+		2. Check Signature: name, decimal, symbol, totalsupply, transfer, balanceOf
+		3. If passed (ERC20), which has totalSupply and transfer move to step 4
+		4. Use Static call to get value of:  name, decimal, symbol, totalsupply, transfer, balanceOf
+		5. Pass value to block parser: contractAddr, value of name, decimal, symbol, totalsupply, transfer, balanceOf
+		*/
+
+	// fmt.Println(code)
+
+	resERC20Basic, err := checkSignature(erc20Basic,code)
+	fmt.Println(resERC20Basic)
+	resERC20Standard, err := checkSignature(erc20Standard,code)
+	fmt.Println(resERC20Standard)
+	resERC20Detail, err := checkSignature(erc20Detail,code)
+	fmt.Println(resERC20Detail)
+
+	// ERC20 only need to have transfer and balanceOf
+	if resERC20Basic[0] == true && resERC20Basic[1] == true{
+		// Name, Symbol, Decimal, Total Supply
+		var result string
+		// Get Name, Symbol
+		for i := 0; i < 2; i++ {
+			if resERC20Detail[i] == true {
+				res, err := evm.getValue(caller, address, erc20Detail[i])
+				result += string(res)
+				result += ","
+				if err == nil {
+					fmt.Println("TSFCall Value: ", reflect.TypeOf(string(res)), string(res))
+				}
+			}
+		}
+		// Get Decimal
+		if resERC20Detail[2] == true {
+			res, err := evm.getValue(caller, address, erc20Detail[2])
+			valueString := hexutil.Encode(res)
+			if err == nil {
+				valueUint := math.MustParseBig256(valueString)
+				result += string(valueString)
+				result += ","
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint), valueUint)
+			}
+		}
+		// Get Total Supply
+		if resERC20Basic[2] == true {
+			res, err := evm.getValue(caller, address, erc20Basic[2])
+			valueString := hexutil.Encode(res)
+			if err == nil {
+				valueUint := math.MustParseBig256(valueString)
+				result += string(valueString)
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint), valueUint)
+			}
+		}
+		fmt.Println(result)
+		evmLog := blockparser.NewEVMLog(caller.Address(), common.BytesToAddress([]byte{}), value, address, result, nil)
+		evm.evmLogDb.GetNewEVMLogToken(evmLog)
+	}
+	
+//=======================================================================
+
 	return ret, address, contract.Gas, err
 
 }
@@ -461,19 +527,40 @@ func (evm *EVM) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
 	evm.evmLogDb = evmLogDb
 }
 
+func checkSignature(methodSig []string, code []byte) ([]bool, error){
+	var ret []bool
+	for i := 0; i < len(methodSig); i++ {
+		// fmt.Println(methodSig[i])
+		res,err := hexutil.Decode(methodSig[i])
+		// fmt.Println(res)
+		if err == nil{
+			ret = append(ret, bytes.Contains(code,res))
+			// fmt.Println(ret)
+		}
+	}
+	return ret, nil
+}
+
+func (evm *EVM) getValue(caller ContractRef, address common.Address, methodSig string) ([]byte, error){
+	res,err := hexutil.Decode(methodSig)
+	res,err = evm.TSFCall(caller, address, res)
+
+	return res, err
+}
 // StaticCall executes the contract associated with the addr with the given input
 // as parameters while disallowing any modifications to the state during the call.
 // Opcodes that attempt to perform such modifications will result in exceptions
 // instead of performing the modifications.
-func (evm *EVM) TSFCall(caller ContractRef, addr common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
+func (evm *EVM) TSFCall(caller ContractRef, addr common.Address, input []byte) (ret []byte, err error) {
 	// 10 billion gas
-	gas := 10000000000
+	var gas uint64 = 1000000000
+	fmt.Println(caller, addr, input)
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
-		return nil, gas, nil
+		return nil, nil
 	}
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
-		return nil, gas, ErrDepth
+		return nil, ErrDepth
 	}
 
 	var (
@@ -490,7 +577,7 @@ func (evm *EVM) TSFCall(caller ContractRef, addr common.Address, input []byte) (
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in Homestead this also counts for code storage gas errors.
 	ret, err = run(evm, contract, input, true)
-
+	// fmt.Println(ret)
 	evm.StateDB.RevertToSnapshot(snapshot)
 	// ret is []byte => parse to string 
 	return ret, err
