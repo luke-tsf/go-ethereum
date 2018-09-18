@@ -36,3 +36,7 @@ func NewEVMLogDb(_customDb ethdb.Database) *EVMLogDb{
 	}
 }
 
+func (evmLogDb *EVMLogDb) Close(){
+	evmLogDb.customDb.Close()
+}
+

@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/params"
+
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 // DefaultConfig contains default settings for use on the Ethereum main net.
@@ -58,6 +60,9 @@ var DefaultConfig = Config{
 		Blocks:     20,
 		Percentile: 60,
 	},
+	//============================================================================== 
+	BlockParser:	blockparser.DefaultConfig,
+	//==============================================================================	
 }
 
 func init() {
@@ -121,6 +126,10 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
+
+	//============================================================================== 
+	BlockParser		blockparser.Config 	`toml:",omitempty"`
+	//============================================================================== 
 }
 
 type configMarshaling struct {

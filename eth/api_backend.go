@@ -236,7 +236,7 @@ func (b *EthAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 
 //==============================================================================
 // TSFEthAPIBackend implements ethapi.Backend for TSF Blockparser
-type TSFEthAPIBackend struct {
-	tsf *TSF
-}
+// type TSFEthAPIBackend struct {
+// 	tsf *TSF
+// }
 //==============================================================================

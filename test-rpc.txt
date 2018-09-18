@@ -1,0 +1,2 @@
+
+- GetTokenInfo: curl -H "Content-Type: application/json" POST --data '{"jsonrpc":"2.0","method":"eth_getTokenInfo","params":["0x0575c6F50D35ADD560712329c04eF48CFD31371c"],"id":1}' http://localhost:8545

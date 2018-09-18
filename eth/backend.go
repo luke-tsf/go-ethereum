@@ -99,14 +99,14 @@ type Ethereum struct {
 // New custom DB when new Ethereum
 	evmLogDb 	*blockparser.EVMLogDb
 // TSF API
-	tsfEthAPIBackend 		*TSFEthAPIBackend
+	// tsfEthAPIBackend 		*TSFEthAPIBackend
 //==============================================================================
 }
 //==============================================================================
 // new pointer for TSF API
-type TSF struct {
-	evmLogDb 			*blockparser.EVMLogDb
-}
+// type TSF struct {
+// 	evmLogDb 			*blockparser.EVMLogDb
+// }
 //==============================================================================
 func (s *Ethereum) AddLesServer(ls LesServer) {
 	s.lesServer = ls
@@ -208,11 +208,12 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	eth.blockchain.SetEVMLogDb(eth.evmLogDb)
 	eth.evmLogDb.TestDb()
 	
-	tsf := &TSF{
-		evmLogDb: eth.evmLogDb,
-	}
-	eth.tsfEthAPIBackend = &TSFEthAPIBackend{tsf}
+
 	// Create new TSFETHAPIBackend
+	// tsf := &TSF{
+	// 	evmLogDb: eth.evmLogDb,
+	// }
+	// eth.tsfEthAPIBackend = &TSFEthAPIBackend{tsf}
 
 
 //==============================================================================
@@ -351,13 +352,15 @@ func (s *Ethereum) APIs() []rpc.API {
 			Service:   s.netRPCService,
 			Public:    true,
 		},
+		//==============================================================================
 		{
 			Namespace: "eth",
 			Version:   "1.0",
-			// insert pointer TSFEthereumAPI
-			Service:   NewTSFEthereumAPI(s.tsfEthAPIBackend.tsf),
+			// insert pointer NewTSFBackendAPI
+			Service:   blockparser.NewTSFBackendAPI(s.evmLogDb),
 			Public:    true,
-		}, 
+		},
+		//============================================================================== 
 	}...)
 }
 
@@ -520,6 +523,9 @@ func (s *Ethereum) Stop() error {
 	s.eventMux.Stop()
 
 	s.chainDb.Close()
+	//============================================================================== 
+	s.evmLogDb.Close()
+	//============================================================================== 
 	close(s.shutdownChan)
 	return nil
 }

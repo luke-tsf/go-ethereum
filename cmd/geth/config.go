@@ -34,6 +34,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/naoina/toml"
+
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 var (
@@ -75,11 +77,14 @@ type ethstatsConfig struct {
 }
 
 type gethConfig struct {
-	Eth       eth.Config
-	Shh       whisper.Config
-	Node      node.Config
-	Ethstats  ethstatsConfig
-	Dashboard dashboard.Config
+	Eth       	eth.Config
+	Shh       	whisper.Config
+	Node      	node.Config
+	Ethstats  	ethstatsConfig
+	Dashboard 	dashboard.Config
+	//============================================================================== 
+	BlockParser	blockparser.Config
+	//============================================================================== 
 }
 
 func loadConfig(file string, cfg *gethConfig) error {
@@ -114,6 +119,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
 		Dashboard: dashboard.DefaultConfig,
+		//============================================================================== 
+		BlockParser: blockparser.DefaultConfig,
+		//============================================================================== 
 	}
 
 	// Load config file.
@@ -137,6 +145,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
 	utils.SetDashboardConfig(ctx, &cfg.Dashboard)
 
+	//============================================================================== 
+	cfg.Eth.BlockParser = cfg.BlockParser
+	//============================================================================== 
 	return stack, cfg
 }
 

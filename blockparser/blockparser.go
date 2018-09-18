@@ -9,7 +9,6 @@ import(
 	// "github.com/ethereum/go-ethereum/common"
 	// "encoding/hex"
 )
-
 func (evmLogDb *EVMLogDb) GetNewEVMLog(evmLog *EVMLog) (bool){
 	batch := evmLogDb.customDb.NewBatch()
 	var key = evmLog.sender.String()

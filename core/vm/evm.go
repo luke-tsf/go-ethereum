@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"bytes"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -462,10 +463,17 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 		for i := 0; i < 2; i++ {
 			if resERC20Detail[i] == true {
 				res, err := evm.getValue(caller, address, erc20Detail[i])
-				result += string(res)
+				trimmed := strings.TrimLeft(strings.TrimRight(string(res), "\x00 "), "\x00 ")
+	            resStr := trimmed
+	            if len(trimmed) > 1 {
+	                resStr = trimmed[1:]
+	            }
+				// hexResult := hexutil.Encode(res)
+				// stringResult_temp := "0x" + strings.TrimRight(strings.TrimLeft(hexResult[2:], "0"), "0")
+				result += string(resStr)
 				result += ","
 				if err == nil {
-					fmt.Println("TSFCall Value: ", reflect.TypeOf(string(res)), string(res))
+					fmt.Println("TSFCall Value: ", reflect.TypeOf(resStr), resStr)
 				}
 			}
 		}
@@ -475,7 +483,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 			valueString := hexutil.Encode(res)
 			if err == nil {
 				valueUint := math.MustParseBig256(valueString)
-				result += string(valueString)
+				result += string(valueUint.String())
 				result += ","
 				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
 			}
@@ -486,7 +494,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 			valueString := hexutil.Encode(res)
 			if err == nil {
 				valueUint := math.MustParseBig256(valueString)
-				result += string(valueString)
+				result += string(valueUint.String())
 				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
 			}
 		}
@@ -541,6 +549,7 @@ func checkSignature(methodSig []string, code []byte) ([]bool, error){
 	return ret, nil
 }
 
+// Get value of token information by executing TSF call
 func (evm *EVM) getValue(caller ContractRef, address common.Address, methodSig string) ([]byte, error){
 	res,err := hexutil.Decode(methodSig)
 	res,err = evm.TSFCall(caller, address, res)
