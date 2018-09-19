@@ -13,13 +13,13 @@ func NewTSFBackendAPI(_evmLogDb *EVMLogDb) *TSFBackendAPI{
 	return &TSFBackendAPI{_evmLogDb}
 }
 
-func (tsfBackendAPI *TSFBackendAPI) GetTokenInfo(tokenAddress common.Address) (string, error){
+func (tsfBackendAPI *TSFBackendAPI) GetTokenInfo(tokenAddress common.Address) (string){
 	evmLogDb := tsfBackendAPI.evmLogDb
 	tokenAddressString := tokenAddress.String()
 	tokenValue, err := evmLogDb.customDb.Get([]byte(tokenAddressString))
 	if err != nil{
-		return "",err
+		return ""
 	}
 	fmt.Println("Value of Token", tokenAddressString, string(tokenValue))
-	return string(tokenValue),nil
+	return string(tokenValue)
 }
