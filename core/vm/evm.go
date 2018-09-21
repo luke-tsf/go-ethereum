@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
+	// "github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/blockparser"
 )
@@ -182,7 +182,7 @@ func (evm *EVM) Interpreter() Interpreter {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
-	fmt.Println("Check call argument",caller, addr, input, gas, value)
+	// fmt.Println("Check call argument",caller, addr, input, gas, value)
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, gas, nil
 	}
@@ -458,45 +458,49 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 	// ERC20 only need to have transfer and balanceOf
 	if resERC20Basic[0] == true && resERC20Basic[1] == true{
 		// Name, Symbol, Decimal, Total Supply
-		var result string
+		var result []string
 		// Get Name, Symbol
 		for i := 0; i < 2; i++ {
 			if resERC20Detail[i] == true {
 				res, err := evm.getValue(caller, address, erc20Detail[i])
 				trimmed := strings.TrimLeft(strings.TrimRight(string(res), "\x00 "), "\x00 ")
-	            resStr := trimmed
-	            if len(trimmed) > 1 {
-	                resStr = trimmed[1:]
-	            }
-				// hexResult := hexutil.Encode(res)
-				// stringResult_temp := "0x" + strings.TrimRight(strings.TrimLeft(hexResult[2:], "0"), "0")
-				result += string(resStr)
-				result += ","
+		        resStr := trimmed
+		        if len(trimmed) > 1 {
+		            resStr = trimmed[1:]
+		        }
+				result = append(result,string(resStr))
 				if err == nil {
 					fmt.Println("TSFCall Value: ", reflect.TypeOf(resStr), resStr)
 				}
+			} else {
+				result = append(result, "")
 			}
 		}
 		// Get Decimal
 		if resERC20Detail[2] == true {
 			res, err := evm.getValue(caller, address, erc20Detail[2])
-			valueString := hexutil.Encode(res)
+			z := new(big.Int)
+			z.SetBytes(res)
+			value := z.String()
+			result = append(result,value)
 			if err == nil {
-				valueUint := math.MustParseBig256(valueString)
-				result += string(valueUint.String())
-				result += ","
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
 			}
+		} else {
+			result = append(result, "")
 		}
 		// Get Total Supply
 		if resERC20Basic[2] == true {
 			res, err := evm.getValue(caller, address, erc20Basic[2])
-			valueString := hexutil.Encode(res)
+			z := new(big.Int)
+			z.SetBytes(res)
+			value := z.String()
+			result = append(result,value)
 			if err == nil {
-				valueUint := math.MustParseBig256(valueString)
-				result += string(valueUint.String())
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(valueUint.String()), valueUint.String())
+				fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
 			}
+		} else {
+			result = append(result, "")
 		}
 		fmt.Println(result)
 		evmLog := blockparser.NewEVMLog(caller.Address(), common.BytesToAddress([]byte{}), value, address, result, nil)

@@ -13,13 +13,17 @@ type EVMLog struct {
 	receiver 			common.Address
 	value				*big.Int
 	tokenERC20			common.Address
-	tokenInformation	string
+	tokenInformation	[]string
 	err 				error
+	txHash				Hash *common.Hash
+	blockNumber			*big.Int
+	gasUsed				math.HexOrDecimal64
 }
 type EVMLogDb struct {
 	customDb		ethdb.Database
+	evmLog 			*[]EVMLog
 }
-func NewEVMLog(_sender common.Address, _receiver common.Address, _value *big.Int, _tokenERC20 common.Address, _tokenInformation string, _err error) *EVMLog{
+func NewEVMLog(_sender common.Address, _receiver common.Address, _value *big.Int, _tokenERC20 common.Address, _tokenInformation []string, _err error) *EVMLog{
 	return &EVMLog{
 		sender: 			_sender,
 		receiver:			_receiver,
