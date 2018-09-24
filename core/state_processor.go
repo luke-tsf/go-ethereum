@@ -17,6 +17,9 @@
 package core
 
 import (
+	"fmt"
+	"github.com/ethereum/go-ethereum/common/math"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
@@ -71,16 +74,33 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg)
+		//=======================================================================
+		// add flag = true
+		flag := true
+		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, flag)
+		//=======================================================================
 		if err != nil {
 			return nil, nil, 0, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+
+		//=======================================================================
+		// get transaction index in block
+		fmt.Println("Set Tx Index for evmLog", i)
+		evmLogs := 	p.bc.evmLogDb.ReturnEVMLogs()	
+		evmLogs[len(evmLogs)-1].SetTxIndex(i)
+		//=======================================================================
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), receipts)
 
+	//=======================================================================
+	// Store all logs into blockparser db then clear current list
+	fmt.Println("Begin Store")
+	p.bc.evmLogDb.Store()	
+	// defer p.bc.evmLogDb.Clear()
+	//=======================================================================
 	return receipts, allLogs, *usedGas, nil
 }
 
@@ -88,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, flag bool) (*types.Receipt, uint64, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	if err != nil {
 		return nil, 0, err
@@ -99,12 +119,33 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 
-//===============================================================================
-	vmenv.SetEVMLogDb(bc.evmLogDb)
-//===============================================================================
+	//=======================================================================
+	// ini evmLogDb for EVM
+	evmLogDb := bc.evmLogDb
+	vmenv.SetEVMLogDb(evmLogDb)
+	//=======================================================================
+
+
 	// Apply the transaction to the current state (included in the env)
-	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
+	//=======================================================================
+	// add new flag
+	_, gas, failed, err := ApplyMessage(vmenv, msg, gp, flag)
+	//=======================================================================
+
+
+	//=======================================================================
+	// Get list of evmLogs after execution this transaction
+	// Newset log in list belongs to this transaction
+	evmLogs := evmLogDb.ReturnEVMLogs()
+	fmt.Println("Evm in state transition:", len(evmLogs))
+
+	//=======================================================================
 	if err != nil {
+		//=======================================================================
+		// if err 
+		evmLogs[len(evmLogs)-1].SetError(err)
+
+		//=======================================================================
 		return nil, 0, err
 	}
 	// Update the state with pending changes
@@ -121,6 +162,7 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	receipt := types.NewReceipt(root, failed, *usedGas)
 	receipt.TxHash = tx.Hash()
 	receipt.GasUsed = gas
+
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To() == nil {
 		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
@@ -129,5 +171,13 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
+	//=======================================================================
+	// get more information of current transaction for evm log
+	evmLogs[len(evmLogs)-1].SetError(nil)
+	evmLogs[len(evmLogs)-1].SetTxHash(receipt.TxHash)
+	evmLogs[len(evmLogs)-1].SetGasUsed(math.HexOrDecimal64(receipt.GasUsed))
+	evmLogs[len(evmLogs)-1].SetEventLog(receipt.Logs)
+	fmt.Println("Newest Log in state processor: ", evmLogs[len(evmLogs)-1])	
+	//=======================================================================	
 	return receipt, gas, err
 }

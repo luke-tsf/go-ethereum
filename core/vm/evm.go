@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	// "github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/blockparser"
 )
@@ -181,7 +181,7 @@ func (evm *EVM) Interpreter() Interpreter {
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
-func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
+func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int, flag bool) (ret []byte, leftOverGas uint64, err error) {
 	// fmt.Println("Check call argument",caller, addr, input, gas, value)
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, gas, nil
@@ -216,11 +216,19 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value)
-//=========================================================================
-	// evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, []byte{}, "No Error")
-	// evm.evmLogDb.GetNewEVMLog(evmLog)
+	//=========================================================================
+	// transfer transaction
+	if flag == true {
+		tokenAddress := common.BytesToAddress([]byte{})
+		txHash := common.BytesToHash([]byte{})
+		blockNumber := evm.BlockNumber
+		gasUsed := math.HexOrDecimal64(0)
+		evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, tokenAddress, []string{}, blockNumber, -1, txHash , gasUsed, nil)
+		evm.evmLogDb.AddNewEVMLog(evmLog)
+	}
+	// fmt.Println(evm.evmLogDb) 
 
-//=========================================================================
+	//=========================================================================
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
@@ -361,7 +369,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 }
 
 // create creates a new contract using code as deployment code.
-func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.Int, address common.Address) ([]byte, common.Address, uint64, error) {
+func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.Int, address common.Address, flag bool) ([]byte, common.Address, uint64, error) {
 	// Depth check execution. Fail if we're trying to execute above the
 	// limit.
 	if evm.depth > int(params.CallCreateDepth) {
@@ -447,65 +455,69 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 		*/
 
 	// fmt.Println(code)
+	if flag == true {
+		resERC20Basic, err := checkSignature(erc20Basic,code)
+		fmt.Println(resERC20Basic)
+		resERC20Standard, err := checkSignature(erc20Standard,code)
+		fmt.Println(resERC20Standard)
+		resERC20Detail, err := checkSignature(erc20Detail,code)
+		fmt.Println(resERC20Detail)
 
-	resERC20Basic, err := checkSignature(erc20Basic,code)
-	fmt.Println(resERC20Basic)
-	resERC20Standard, err := checkSignature(erc20Standard,code)
-	fmt.Println(resERC20Standard)
-	resERC20Detail, err := checkSignature(erc20Detail,code)
-	fmt.Println(resERC20Detail)
-
-	// ERC20 only need to have transfer and balanceOf
-	if resERC20Basic[0] == true && resERC20Basic[1] == true{
-		// Name, Symbol, Decimal, Total Supply
-		var result []string
-		// Get Name, Symbol
-		for i := 0; i < 2; i++ {
-			if resERC20Detail[i] == true {
-				res, err := evm.getValue(caller, address, erc20Detail[i])
-				trimmed := strings.TrimLeft(strings.TrimRight(string(res), "\x00 "), "\x00 ")
-		        resStr := trimmed
-		        if len(trimmed) > 1 {
-		            resStr = trimmed[1:]
-		        }
-				result = append(result,string(resStr))
+		// ERC20 only need to have transfer and balanceOf
+		if resERC20Basic[0] == true && resERC20Basic[1] == true{
+			// Name, Symbol, Decimal, Total Supply
+			var result []string
+			// Get Name, Symbol
+			for i := 0; i < 2; i++ {
+				if resERC20Detail[i] == true {
+					res, err := evm.getValue(caller, address, erc20Detail[i])
+					trimmed := strings.TrimLeft(strings.TrimRight(string(res), "\x00 "), "\x00 ")
+			        resStr := trimmed
+			        if len(trimmed) > 1 {
+			            resStr = trimmed[1:]
+			        }
+					result = append(result,string(resStr))
+					if err == nil {
+						fmt.Println("TSFCall Value: ", reflect.TypeOf(resStr), resStr)
+					}
+				} else {
+					result = append(result, "")
+				}
+			}
+			// Get Decimal
+			if resERC20Detail[2] == true {
+				res, err := evm.getValue(caller, address, erc20Detail[2])
+				z := new(big.Int)
+				z.SetBytes(res)
+				value := z.String()
+				result = append(result,value)
 				if err == nil {
-					fmt.Println("TSFCall Value: ", reflect.TypeOf(resStr), resStr)
+					fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
 				}
 			} else {
 				result = append(result, "")
 			}
-		}
-		// Get Decimal
-		if resERC20Detail[2] == true {
-			res, err := evm.getValue(caller, address, erc20Detail[2])
-			z := new(big.Int)
-			z.SetBytes(res)
-			value := z.String()
-			result = append(result,value)
-			if err == nil {
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
+			// Get Total Supply
+			if resERC20Basic[2] == true {
+				res, err := evm.getValue(caller, address, erc20Basic[2])
+				z := new(big.Int)
+				z.SetBytes(res)
+				value := z.String()
+				result = append(result,value)
+				if err == nil {
+					fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
+				}
+			} else {
+				result = append(result, "")
 			}
-		} else {
-			result = append(result, "")
+			fmt.Println(result)
+			// Initialize evm log
+			evmLog := blockparser.NewEVMLogNewToken(caller.Address(), common.BytesToAddress([]byte{}), value, address, result, nil)
+			evm.evmLogDb.AddNewEVMLog(evmLog)
+			// evm.evmLogDb.GetNewEVMLogToken(evmLog)
 		}
-		// Get Total Supply
-		if resERC20Basic[2] == true {
-			res, err := evm.getValue(caller, address, erc20Basic[2])
-			z := new(big.Int)
-			z.SetBytes(res)
-			value := z.String()
-			result = append(result,value)
-			if err == nil {
-				fmt.Println("TSFCall Value: ", reflect.TypeOf(value), value)
-			}
-		} else {
-			result = append(result, "")
-		}
-		fmt.Println(result)
-		evmLog := blockparser.NewEVMLog(caller.Address(), common.BytesToAddress([]byte{}), value, address, result, nil)
-		evm.evmLogDb.GetNewEVMLogToken(evmLog)
 	}
+	
 	
 //=======================================================================
 
@@ -514,18 +526,18 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 }
 
 // Create creates a new contract using code as deployment code.
-func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int, flag bool) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
-	return evm.create(caller, code, gas, value, contractAddr)
+	return evm.create(caller, code, gas, value, contractAddr, flag)
 }
 
 // Create2 creates a new contract using code as deployment code.
 //
 // The different between Create2 with Create is Create2 uses sha3(0xff ++ msg.sender ++ salt ++ sha3(init_code))[12:]
 // instead of the usual sender-and-nonce-hash as the address where the contract is initialized at.
-func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *big.Int, flag bool) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress2(caller.Address(), common.BigToHash(salt), code)
-	return evm.create(caller, code, gas, endowment, contractAddr)
+	return evm.create(caller, code, gas, endowment, contractAddr, flag)
 }
 
 // ChainConfig returns the environment's chain configuration
@@ -537,6 +549,10 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
 func (evm *EVM) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
 	evm.evmLogDb = evmLogDb
+}
+
+func (evm *EVM) GetEVMLogDb() *blockparser.EVMLogDb {
+	return evm.evmLogDb
 }
 
 func checkSignature(methodSig []string, code []byte) ([]bool, error){
@@ -595,4 +611,6 @@ func (evm *EVM) TSFCall(caller ContractRef, addr common.Address, input []byte) (
 	// ret is []byte => parse to string 
 	return ret, err
 }
+
+
 //=======================================================================
