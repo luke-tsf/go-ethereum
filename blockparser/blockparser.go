@@ -53,14 +53,23 @@ func (evmLogDb *EVMLogDb) Store() {
 			}
 		}	
 	}
+	evmLogDb.clear()
 }
 // Clear current list of evmlogs in evmlogDb
 func (evmLogDb *EVMLogDb) clear() {
-	evmLogDb.evmLogs = []*EVMLog{}
-	fmt.Println(evmLogDb.evmLogs)
+	// evmLogs := evmLogDb.evmLogs
+	// for len(evmLogs) > 0 {
+	// 	evmLogs[0] = nil
+	// 	if len(evmLogs) != 1{
+	// 		evmLogs = evmLogs[1:]
+	// 	} else {
+			
+	// 	}
+	// }
+	evmLogDb.evmLogs = evmLogDb.evmLogs[:0]
+	fmt.Println("Empty list of evmlog: ", len(evmLogDb.evmLogs) == 0)
+	// fmt.Println(evmLogDb.evmLogs)
 }
-
-
 // Store all evmLog to db 
 /*
 	Db for token information
@@ -87,7 +96,7 @@ func (evmLogDb *EVMLogDb) storeEVMLogTokenInfo(evmLog *EVMLog) (bool){
 // Store DB format
 /*
 	History DB for Ethereum Transfer Transaction
-		address - 100million minor blockNumber - 100000 minor txIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1) 	
+		address - 100million minor blockNumber - 100000 minor txIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1, 2 self) 	
 	====================================================================================================================================
 			0x123456-99999990-9999-0x789012					||   		0x123456-0xabcdef-10-1
 	address: 0x123456
@@ -118,25 +127,38 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 	var txIndex = 100000 - evmLog.txIndex
 	var txHash = evmLog.txHash.String()
 
-	// generate key and value for sender
-	var keySender = string(sender + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
-	var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "1")
-	batch.Put([]byte(keySender), []byte(valueSender))
-	
-	// generate key and value for receiver
-	var keyReceiver = string(receiver + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
-	var valueReceiver = string(sender + "-" + receiver + "-" +  value + "-" + "0")
-	batch.Put([]byte(keyReceiver), []byte(valueReceiver))
+	if sender == receiver {
+		var keySender = string(sender + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
+		var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "2")
+		batch.Put([]byte(keySender), []byte(valueSender))
+		batch.Write()
+		getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
+		if err != nil{
+			return false
+		}
+		fmt.Println("Transfer History of Sender", string(keySender), string(getValueSender))
+	} else {
+		// generate key and value for sender
+		var keySender = string(sender + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
+		var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "1")
+		batch.Put([]byte(keySender), []byte(valueSender))
+		
+		// generate key and value for receiver
+		var keyReceiver = string(receiver + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
+		var valueReceiver = string(sender + "-" + receiver + "-" +  value + "-" + "0")
+		batch.Put([]byte(keyReceiver), []byte(valueReceiver))
 
-	batch.Write()
-	getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
-	getValueReceiver, err := evmLogDb.customDb.Get([]byte(keyReceiver))
-	if err != nil{
-		return false
+		batch.Write()
+		getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
+		getValueReceiver, err := evmLogDb.customDb.Get([]byte(keyReceiver))
+		if err != nil{
+			return false
+		}
+		// var address =  string(common.BytesToAddress(key))
+		fmt.Println("Transfer History of Sender", string(keySender), string(getValueSender))
+		fmt.Println("Transfer History of Receiver", string(keyReceiver), string(getValueReceiver))
 	}
-	// var address =  string(common.BytesToAddress(key))
-	fmt.Println("Value of Token", string(keySender), string(getValueSender))
-	fmt.Println("Value of Token", string(keyReceiver), string(getValueReceiver))
+	
 	return true
 }
 /*
@@ -155,6 +177,9 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 	value (amount of ERC20): 10
 	sender: 0x123456 => flag = 1
 */
+
+
+
 
 // Test DB when init ETH API
 func (evmLogDb *EVMLogDb) TestDb() (bool){

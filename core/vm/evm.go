@@ -181,7 +181,7 @@ func (evm *EVM) Interpreter() Interpreter {
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
-func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int, flag bool) (ret []byte, leftOverGas uint64, err error) {
+func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
 	// fmt.Println("Check call argument",caller, addr, input, gas, value)
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, gas, nil
@@ -218,11 +218,21 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value)
 	//=========================================================================
 	// transfer transaction
+	// flag signal for write log
+	fmt.Println("Write right in EVM Call Method: ", evm.evmLogDb.IsWrite())
+	flag := evm.evmLogDb.IsWrite()
 	if flag == true {
 		tokenAddress := common.BytesToAddress([]byte{})
 		txHash := common.BytesToHash([]byte{})
 		blockNumber := evm.BlockNumber
 		gasUsed := math.HexOrDecimal64(0)
+		// sender := common.BytesToAddress(caller.Address().Bytes())
+		// receiver := common.BytesToAddress(to.Address().Bytes())
+		// valueEth := big.NewInt(0)
+		// valueEth.Add(valueEth, value)
+		// fmt.Println("Equal sender", reflect.DeepEqual(sender, caller.Addres()))
+		// fmt.Println("Equal receiver", reflect.DeepEqual(receiver, to.Addres()))
+		// fmt.Println("Equal value", reflect.DeepEqual(valueEth, value))
 		evmLog := blockparser.NewEVMLog(caller.Address(), to.Address(), value, tokenAddress, []string{}, blockNumber, -1, txHash , gasUsed, nil)
 		evm.evmLogDb.AddNewEVMLog(evmLog)
 	}
@@ -369,7 +379,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 }
 
 // create creates a new contract using code as deployment code.
-func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.Int, address common.Address, flag bool) ([]byte, common.Address, uint64, error) {
+func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.Int, address common.Address) ([]byte, common.Address, uint64, error) {
 	// Depth check execution. Fail if we're trying to execute above the
 	// limit.
 	if evm.depth > int(params.CallCreateDepth) {
@@ -455,6 +465,9 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 		*/
 
 	// fmt.Println(code)
+	// flag signal for write log
+	flag := evm.evmLogDb.IsWrite()
+	fmt.Println("Write right in EVM Create Method: ", evm.evmLogDb.IsWrite())
 	if flag == true {
 		resERC20Basic, err := checkSignature(erc20Basic,code)
 		fmt.Println(resERC20Basic)
@@ -462,7 +475,7 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 		fmt.Println(resERC20Standard)
 		resERC20Detail, err := checkSignature(erc20Detail,code)
 		fmt.Println(resERC20Detail)
-
+		fmt.Println(err)
 		// ERC20 only need to have transfer and balanceOf
 		if resERC20Basic[0] == true && resERC20Basic[1] == true{
 			// Name, Symbol, Decimal, Total Supply
@@ -512,6 +525,13 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 			}
 			fmt.Println(result)
 			// Initialize evm log
+			// sender := common.BytesToAddress(caller.Address().Bytes())
+			// receiver := common.BytesToAddress(to.Address().Bytes())
+			// valueEth := big.NewInt(0)
+			// valueEth.Add(valueEth, value)
+			// fmt.Println("Equal sender", reflect.DeepEqual(sender, caller.Addres()))
+			// fmt.Println("Equal receiver", reflect.DeepEqual(receiver, to.Addres()))
+			// fmt.Println("Equal value", reflect.DeepEqual(valueEth, value))
 			evmLog := blockparser.NewEVMLogNewToken(caller.Address(), common.BytesToAddress([]byte{}), value, address, result, nil)
 			evm.evmLogDb.AddNewEVMLog(evmLog)
 			// evm.evmLogDb.GetNewEVMLogToken(evmLog)
@@ -526,18 +546,18 @@ func (evm *EVM) create(caller ContractRef, code []byte, gas uint64, value *big.I
 }
 
 // Create creates a new contract using code as deployment code.
-func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int, flag bool) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
-	return evm.create(caller, code, gas, value, contractAddr, flag)
+	return evm.create(caller, code, gas, value, contractAddr)
 }
 
 // Create2 creates a new contract using code as deployment code.
 //
 // The different between Create2 with Create is Create2 uses sha3(0xff ++ msg.sender ++ salt ++ sha3(init_code))[12:]
 // instead of the usual sender-and-nonce-hash as the address where the contract is initialized at.
-func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *big.Int, flag bool) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress2(caller.Address(), common.BigToHash(salt), code)
-	return evm.create(caller, code, gas, endowment, contractAddr, flag)
+	return evm.create(caller, code, gas, endowment, contractAddr)
 }
 
 // ChainConfig returns the environment's chain configuration

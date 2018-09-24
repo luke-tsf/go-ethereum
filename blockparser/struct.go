@@ -26,6 +26,7 @@ type EVMLog struct {
 type EVMLogDb struct {
 	customDb		ethdb.Database
 	evmLogs 		[]*EVMLog
+	isWrite			bool
 }
 func NewEVMLog(_sender common.Address, _receiver common.Address, _value *big.Int, 
 	_tokenERC20 common.Address, _tokenInformation []string, _blockNumber *big.Int, 
@@ -75,7 +76,21 @@ func (evmLog *EVMLog) SetTxIndex(txIndex int) {
 func NewEVMLogDb(_customDb ethdb.Database) *EVMLogDb{
 	return &EVMLogDb{
 		customDb:	_customDb,
+		isWrite:	false,
 	}
+}
+
+// flag
+func (evmLogDb *EVMLogDb) StartWrite() {
+	evmLogDb.isWrite = true
+}
+
+func (evmLogDb *EVMLogDb) EndWrite() {
+	evmLogDb.isWrite = false
+}
+
+func (evmLogDb *EVMLogDb) IsWrite() (bool) {
+	return evmLogDb.isWrite
 }
 
 func (evmLogDb *EVMLogDb) Close(){

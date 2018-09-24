@@ -30,7 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 
 
-	// "github.com/ethereum/go-ethereum/blockparser"
+	"github.com/ethereum/go-ethereum/blockparser"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -71,14 +71,14 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
+	//=======================================================================
+	// add flag = true
+	p.bc.evmLogDb.StartWrite()
+	//=======================================================================
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		//=======================================================================
-		// add flag = true
-		flag := true
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, flag)
-		//=======================================================================
+		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -97,8 +97,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 	//=======================================================================
 	// Store all logs into blockparser db then clear current list
-	fmt.Println("Begin Store")
-	p.bc.evmLogDb.Store()	
+	if p.bc.evmLogDb.IsWrite() {
+		fmt.Println("Begin Store")
+		p.bc.evmLogDb.Store()
+		p.bc.evmLogDb.EndWrite()	
+	}
+	fmt.Println("Write right after process all transaction ",p.bc.evmLogDb.IsWrite())
 	// defer p.bc.evmLogDb.Clear()
 	//=======================================================================
 	return receipts, allLogs, *usedGas, nil
@@ -108,7 +112,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, flag bool) (*types.Receipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, uint64, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	if err != nil {
 		return nil, 0, err
@@ -127,25 +131,23 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 
 
 	// Apply the transaction to the current state (included in the env)
-	//=======================================================================
-	// add new flag
-	_, gas, failed, err := ApplyMessage(vmenv, msg, gp, flag)
-	//=======================================================================
+	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
 
 
 	//=======================================================================
 	// Get list of evmLogs after execution this transaction
 	// Newset log in list belongs to this transaction
-	evmLogs := evmLogDb.ReturnEVMLogs()
-	fmt.Println("Evm in state transition:", len(evmLogs))
-
+	fmt.Println("Write right in state processor: ",evmLogDb.IsWrite())
+	var evmLogs []*blockparser.EVMLog
+	if evmLogDb.IsWrite() == true {
+		evmLogs = evmLogDb.ReturnEVMLogs()
+		fmt.Println("Evm in state transition:", len(evmLogs))
+	}
+	if len(evmLogs) > 0 && err != nil && evmLogDb.IsWrite() == true {
+		evmLogs[len(evmLogs)-1].SetError(err)
+	}
 	//=======================================================================
 	if err != nil {
-		//=======================================================================
-		// if err 
-		evmLogs[len(evmLogs)-1].SetError(err)
-
-		//=======================================================================
 		return nil, 0, err
 	}
 	// Update the state with pending changes
@@ -173,11 +175,17 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 
 	//=======================================================================
 	// get more information of current transaction for evm log
-	evmLogs[len(evmLogs)-1].SetError(nil)
-	evmLogs[len(evmLogs)-1].SetTxHash(receipt.TxHash)
-	evmLogs[len(evmLogs)-1].SetGasUsed(math.HexOrDecimal64(receipt.GasUsed))
-	evmLogs[len(evmLogs)-1].SetEventLog(receipt.Logs)
-	fmt.Println("Newest Log in state processor: ", evmLogs[len(evmLogs)-1])	
+	fmt.Println("Write right: ", evmLogDb.IsWrite())
+	if evmLogDb.IsWrite() == true {
+		if len(evmLogs) > 0 {
+			// txHash := common.BytesToHash(receipt.TxHash.Bytes())
+			evmLogs[len(evmLogs)-1].SetError(nil)
+			evmLogs[len(evmLogs)-1].SetTxHash(receipt.TxHash)
+			evmLogs[len(evmLogs)-1].SetGasUsed(math.HexOrDecimal64(receipt.GasUsed))
+			evmLogs[len(evmLogs)-1].SetEventLog(receipt.Logs)
+			fmt.Println("Newest Log in state processor: ", evmLogs[len(evmLogs)-1])	
+		}
+	}
 	//=======================================================================	
 	return receipt, gas, err
 }
