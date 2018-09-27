@@ -130,3 +130,17 @@ func (l *LogForStorage) DecodeRLP(s *rlp.Stream) error {
 	}
 	return err
 }
+//===============================================================================
+func (log *Log) GetAddress() common.Address {
+	return log.Address
+}
+func (log *Log) GetTopics() []common.Hash {
+	return log.Topics
+}
+func (log *Log) GetIndex() uint {
+	return log.Index
+}
+func (log *Log) GetData() []byte {
+	return log.Data
+}
+//===============================================================================

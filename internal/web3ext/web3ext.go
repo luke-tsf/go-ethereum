@@ -477,6 +477,12 @@ web3._extend({
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputAddressFormatter]
 		}),
+		new web3._extend.Method({
+			name: 'getAccountHistory',
+			call: 'eth_getAccountHistory',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputAddressFormatter]
+		}),
 		//=======================================================================
 	],
 	properties: [

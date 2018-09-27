@@ -7,7 +7,9 @@ import(
 	"reflect"
 	"math/big"
 	"strconv"
-	// "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	// "github.com/ethereum/go-ethereum/common/hexutil"
 	// "encoding/hex"
 )
 
@@ -15,7 +17,10 @@ import(
 // Add new evm Log to current array of evm log db
 var (
 	addressZero = "0x0000000000000000000000000000000000000000"
+	transferSigString = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+	transferSig = common.HexToHash(transferSigString)
 )
+
 func (evmLogDb *EVMLogDb) AddNewEVMLog(evmLog *EVMLog) (bool){
 	evmLogDb.evmLogs = append(evmLogDb.evmLogs, evmLog) 
 	fmt.Println("Get New EVM Log", evmLog)
@@ -43,32 +48,22 @@ func (evmLogDb *EVMLogDb) Store() {
 	evmLogs := evmLogDb.evmLogs
 	for i, evmLog := range evmLogs {
 		fmt.Println("Log number : ", i)
-		fmt.Println("EvmLog Token ERC20", evmLog.tokenERC20.String())
-		fmt.Println("EvmLog Token Info", reflect.DeepEqual(evmLog.tokenInformation,[]string{}))
+		// fmt.Println("EvmLog Token ERC20", evmLog.tokenERC20.String())
+		// fmt.Println("EvmLog Token Info", reflect.DeepEqual(evmLog.tokenInformation,[]string{}))
 		if evmLog.err == nil {
 			if evmLog.receiver.String() == addressZero && evmLog.tokenERC20.String() != addressZero{
 				evmLogDb.storeEVMLogTokenInfo(evmLog)
-			} else if evmLog.tokenERC20.String() == addressZero && reflect.DeepEqual(evmLog.tokenInformation,[]string{}) {
-				evmLogDb.storeEVMLogTransfer(evmLog)
-			}
+			} else {
+				evmLogDb.storeEVMLogERC20OrTransfer(evmLog)
+			} 
 		}	
 	}
 	evmLogDb.clear()
 }
 // Clear current list of evmlogs in evmlogDb
 func (evmLogDb *EVMLogDb) clear() {
-	// evmLogs := evmLogDb.evmLogs
-	// for len(evmLogs) > 0 {
-	// 	evmLogs[0] = nil
-	// 	if len(evmLogs) != 1{
-	// 		evmLogs = evmLogs[1:]
-	// 	} else {
-			
-	// 	}
-	// }
 	evmLogDb.evmLogs = evmLogDb.evmLogs[:0]
 	fmt.Println("Empty list of evmlog: ", len(evmLogDb.evmLogs) == 0)
-	// fmt.Println(evmLogDb.evmLogs)
 }
 // Store all evmLog to db 
 /*
@@ -145,13 +140,14 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 		
 		// generate key and value for receiver
 		var keyReceiver = string(receiver + "-" + blockNumber + "-" + strconv.Itoa(txIndex) + "-" + txHash)
-		var valueReceiver = string(sender + "-" + receiver + "-" +  value + "-" + "0")
+		var valueReceiver = string(sender + "-" + receiver + "-" + value + "-" + "0")
 		batch.Put([]byte(keyReceiver), []byte(valueReceiver))
 
 		batch.Write()
 		getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
 		getValueReceiver, err := evmLogDb.customDb.Get([]byte(keyReceiver))
 		if err != nil{
+			fmt.Println("err in get transfer log", err)
 			return false
 		}
 		// var address =  string(common.BytesToAddress(key))
@@ -162,11 +158,12 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 	return true
 }
 /*
-	History DB for Ethereum Transfer Transaction
-		address - 100million minor blockNumber - 10000 minor txIndex - 100 minor eventIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1) 	
+	History DB for Ethereum ERC20 Transaction
+		address - token - 100million minor blockNumber - 10000 minor txIndex - 100 minor eventIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1 or self = 2) 	
 	============================================================================================================================================================
 			0x123456-99999990-9999-90-0x789012					||   		0x123456-0xabcdef-10-1
 	address: 0x123456
+	token: 0xab123123 (ERC20 contract)
 	blNumber: 10 => 99999990
 	txIndex: 1 => 9999
 	eventIndex: 10 => 90
@@ -177,6 +174,109 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 	value (amount of ERC20): 10
 	sender: 0x123456 => flag = 1
 */
+
+
+/*
+	History DB for Ethereum ERC20 Contract
+		token - 100million minor blockNumber - 10000 minor txIndex - 100 minor eventIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1) 	
+	============================================================================================================================================================
+			0x123456-99999990-9999-90-0x789012					||   		0x123456-0xabcdef-10-1
+	token: 0xab123123 (ERC20 contract)
+	blNumber: 10 => 99999990
+	txIndex: 1 => 9999
+	eventIndex: 10 => 90
+	txHash: 0x789012
+
+	from: 0x123456
+	to: 0xabcdef
+	value (amount of ERC20): 10
+*/
+func (evmLogDb *EVMLogDb) storeEVMLogERC20(evmLog *EVMLog) (bool){
+	// var blockNumberBigInt *big.Int
+	// fmt.Println("Here 1")
+	var bigNumber = big.NewInt(100000000)
+	// fmt.Println("Init big int number", reflect.TypeOf(bigNumber), bigNumber)
+	// fmt.Println("Get block number", reflect.TypeOf(evmLog.blockNumber), evmLog.blockNumber)
+	bigNumber.Sub(bigNumber,evmLog.blockNumber)
+	// fmt.Println("Here 2")
+	blockNumber := bigNumber.String()
+
+	var txIndex = 100000 - evmLog.txIndex
+	var txHash = evmLog.txHash.String()
+
+	var logs = evmLog.eventLog
+
+
+	for _, log := range logs {
+		// event Transfer(address indexed from, address indexed to, uint value)
+		// Topic 0 is event signature
+		// Topic 1 is from
+		// Topic 2 is to
+		topics := log.GetTopics()
+		if reflect.DeepEqual(topics[0],transferSig) {
+			batch := evmLogDb.customDb.NewBatch()
+			contractAddress := log.GetAddress().String()
+			sender := common.BytesToAddress(topics[1].Bytes()).String()
+			receiver := common.BytesToAddress(topics[2].Bytes()).String()
+			z := new(big.Int)
+			z.SetBytes(log.GetData())
+			value := z.String()
+			eventIndex := int(100 - log.GetIndex())
+			if sender == receiver {
+				var keySender = string(sender + "-" + contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
+				var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "2")
+				batch.Put([]byte(keySender), []byte(valueSender))
+				batch.Write()
+				getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
+				if err != nil{
+					return false
+				}
+				fmt.Println("Transfer History of Sender", string(keySender), string(getValueSender))
+			} else {
+				var keySender = string(sender + "-" + contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
+				var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "1")
+				batch.Put([]byte(keySender), []byte(valueSender))
+				
+				// generate key and value for receiver
+				var keyReceiver = string(receiver + "-" + contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
+				var valueReceiver = string(sender + "-" + receiver + "-" +  value + "-" + "0")
+				batch.Put([]byte(keyReceiver), []byte(valueReceiver))
+			
+				var keyToken = string(				contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
+				var valueToken = string(sender + "-" + receiver + "-" +  value + "-" )
+				batch.Put([]byte(keyToken), []byte(valueToken))
+				batch.Write()
+
+				getValueSender, err := evmLogDb.customDb.Get([]byte(keySender))
+				getValueReceiver, err := evmLogDb.customDb.Get([]byte(keyReceiver))
+				getValueToken, err := evmLogDb.customDb.Get([]byte(keyToken))
+				if err != nil{
+					fmt.Println("err in get erc20 log", err)
+					return false
+				}
+				
+				fmt.Println("Transfer History of Sender", string(keySender), string(getValueSender))
+				fmt.Println("Transfer History of Receiver", string(keyReceiver), string(getValueReceiver))
+				fmt.Println("Transfer History of Receiver", string(keyToken), string(getValueToken))
+			}
+		}
+	}
+	return true
+}
+
+
+
+func (evmLogDb *EVMLogDb) storeEVMLogERC20OrTransfer(evmLog *EVMLog) (bool){
+	var value = evmLog.value.String()
+	// call transfer
+	fmt.Println("This is value: ",value)
+	evmLogDb.storeEVMLogTransfer(evmLog)
+
+	if reflect.DeepEqual(evmLog.eventLog,[]*types.Log{}) == false {
+		evmLogDb.storeEVMLogERC20(evmLog)
+	}
+	return true
+}
 
 
 

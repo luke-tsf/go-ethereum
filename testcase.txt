@@ -1,0 +1,14 @@
+1. Deploy and Check token ERC20:
+
+2. Get information of ERC20
+
+3. Transfer Ethereum:
+	self transfer
+	transfer 0 ethereum
+
+4. ERC20 
+	in-direct call: x
+	direct call => transfer transaction + erc20 transaction
+	call + transfer money: x
+
+Still not solve internal transaction for transfer
