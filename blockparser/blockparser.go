@@ -19,6 +19,9 @@ var (
 	addressZero = "0x0000000000000000000000000000000000000000"
 	transferSigString = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 	transferSig = common.HexToHash(transferSigString)
+	blockBigNumber = big.NewInt(100000000)
+	txBigNumber = 99999
+	eventBigNumber = uint(99)
 )
 
 func (evmLogDb *EVMLogDb) AddNewEVMLog(evmLog *EVMLog) (bool){
@@ -65,6 +68,23 @@ func (evmLogDb *EVMLogDb) clear() {
 	evmLogDb.evmLogs = evmLogDb.evmLogs[:0]
 	fmt.Println("Empty list of evmlog: ", len(evmLogDb.evmLogs) == 0)
 }
+
+
+
+func (evmLogDb *EVMLogDb) storeEVMLogERC20OrTransfer(evmLog *EVMLog) (bool){
+	var value = evmLog.value.String()
+	// call transfer
+	fmt.Println("This is value: ",value)
+	evmLogDb.storeEVMLogTransfer(evmLog)
+
+	if reflect.DeepEqual(evmLog.eventLog,[]*types.Log{}) == false {
+		evmLogDb.storeEVMLogERC20(evmLog)
+	}
+	return true
+}
+
+
+
 // Store all evmLog to db 
 /*
 	Db for token information
@@ -91,12 +111,12 @@ func (evmLogDb *EVMLogDb) storeEVMLogTokenInfo(evmLog *EVMLog) (bool){
 // Store DB format
 /*
 	History DB for Ethereum Transfer Transaction
-		address - 100million minor blockNumber - 100000 minor txIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1, 2 self) 	
+		address - 99million minor blockNumber - 99999 minor txIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1, 2 self) 	
 	====================================================================================================================================
 			0x123456-99999990-9999-0x789012					||   		0x123456-0xabcdef-10-1
 	address: 0x123456
-	blNumber: 10 => 99999990
-	txIndex: 1 => 99999
+	blNumber: 10 => 99999989
+	txIndex: 1 => 99998
 	txHash: 0x789012
 
 	from: 0x123456
@@ -112,14 +132,14 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 
 	// var blockNumberBigInt *big.Int
 	// fmt.Println("Here 1")
-	var bigNumber = big.NewInt(100000000)
+	var bigNumber = blockBigNumber
 	// fmt.Println("Init big int number", reflect.TypeOf(bigNumber), bigNumber)
 	// fmt.Println("Get block number", reflect.TypeOf(evmLog.blockNumber), evmLog.blockNumber)
 	bigNumber.Sub(bigNumber,evmLog.blockNumber)
 	// fmt.Println("Here 2")
 	blockNumber := bigNumber.String()
 
-	var txIndex = 100000 - evmLog.txIndex
+	var txIndex = txBigNumber - evmLog.txIndex
 	var txHash = evmLog.txHash.String()
 
 	if sender == receiver {
@@ -159,14 +179,14 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 }
 /*
 	History DB for Ethereum ERC20 Transaction
-		address - token - 100million minor blockNumber - 10000 minor txIndex - 100 minor eventIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1 or self = 2) 	
+		address - token - 99million minor blockNumber - 99999 minor txIndex - 99 minor eventIndex - transactionHash	||	 from-to-value-flag(receiver=0 or sender=1 or self = 2) 	
 	============================================================================================================================================================
 			0x123456-99999990-9999-90-0x789012					||   		0x123456-0xabcdef-10-1
 	address: 0x123456
 	token: 0xab123123 (ERC20 contract)
-	blNumber: 10 => 99999990
-	txIndex: 1 => 9999
-	eventIndex: 10 => 90
+	blNumber: 10 => 99999989
+	txIndex: 1 => 9998
+	eventIndex: 10 => 89
 	txHash: 0x789012
 
 	from: 0x123456
@@ -194,14 +214,14 @@ func (evmLogDb *EVMLogDb) storeEVMLogTransfer(evmLog *EVMLog) (bool){
 func (evmLogDb *EVMLogDb) storeEVMLogERC20(evmLog *EVMLog) (bool){
 	// var blockNumberBigInt *big.Int
 	// fmt.Println("Here 1")
-	var bigNumber = big.NewInt(100000000)
+	var bigNumber = blockBigNumber
 	// fmt.Println("Init big int number", reflect.TypeOf(bigNumber), bigNumber)
 	// fmt.Println("Get block number", reflect.TypeOf(evmLog.blockNumber), evmLog.blockNumber)
 	bigNumber.Sub(bigNumber,evmLog.blockNumber)
 	// fmt.Println("Here 2")
 	blockNumber := bigNumber.String()
 
-	var txIndex = 100000 - evmLog.txIndex
+	var txIndex = txBigNumber - evmLog.txIndex
 	var txHash = evmLog.txHash.String()
 
 	var logs = evmLog.eventLog
@@ -221,7 +241,7 @@ func (evmLogDb *EVMLogDb) storeEVMLogERC20(evmLog *EVMLog) (bool){
 			z := new(big.Int)
 			z.SetBytes(log.GetData())
 			value := z.String()
-			eventIndex := int(100 - log.GetIndex())
+			eventIndex := int(eventBigNumber - log.GetIndex())
 			if sender == receiver {
 				var keySender = string(sender + "-" + contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
 				var valueSender = string(sender + "-" + receiver + "-" +  value + "-" + "2")
@@ -243,7 +263,7 @@ func (evmLogDb *EVMLogDb) storeEVMLogERC20(evmLog *EVMLog) (bool){
 				batch.Put([]byte(keyReceiver), []byte(valueReceiver))
 			
 				var keyToken = string(				contractAddress + "-"+ blockNumber + "-" + strconv.Itoa(txIndex) + "-" + strconv.Itoa(eventIndex) + "-" + txHash)
-				var valueToken = string(sender + "-" + receiver + "-" +  value + "-" )
+				var valueToken = string(sender + "-" + receiver + "-" +  value)
 				batch.Put([]byte(keyToken), []byte(valueToken))
 				batch.Write()
 
@@ -257,26 +277,13 @@ func (evmLogDb *EVMLogDb) storeEVMLogERC20(evmLog *EVMLog) (bool){
 				
 				fmt.Println("Transfer History of Sender", string(keySender), string(getValueSender))
 				fmt.Println("Transfer History of Receiver", string(keyReceiver), string(getValueReceiver))
-				fmt.Println("Transfer History of Receiver", string(keyToken), string(getValueToken))
+				fmt.Println("Transfer History of Token", string(keyToken), string(getValueToken))
 			}
 		}
 	}
 	return true
 }
 
-
-
-func (evmLogDb *EVMLogDb) storeEVMLogERC20OrTransfer(evmLog *EVMLog) (bool){
-	var value = evmLog.value.String()
-	// call transfer
-	fmt.Println("This is value: ",value)
-	evmLogDb.storeEVMLogTransfer(evmLog)
-
-	if reflect.DeepEqual(evmLog.eventLog,[]*types.Log{}) == false {
-		evmLogDb.storeEVMLogERC20(evmLog)
-	}
-	return true
-}
 
 
 

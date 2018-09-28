@@ -3,10 +3,12 @@ package blockparser
 // call value from database
 import (
 	"fmt"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	// "github.com/syndtr/goleveldb/leveldb/iterator"
 	// "github.com/syndtr/goleveldb/leveldb"
-	// "github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 type TSFBackendAPI struct {
 	evmLogDb *EVMLogDb
@@ -28,19 +30,29 @@ func (tsfBackendAPI *TSFBackendAPI) GetTokenInfo(tokenAddress common.Address) (s
 }
 
 func (tsfBackendAPI *TSFBackendAPI) GetAccountHistory(address common.Address) (string){
-	// fmt.Println("Enter get account History")
-	// evmLogDb := tsfBackendAPI.evmLogDb
-	// addressString := address.String()
-	// fmt.Println("Address to get history: ", addressString)
-	// fmt.Println("Type of db", reflect.TypeOf(evmLogDb.customDb)
-	// LD, err := evmLogDb.customDb.NewLDBDatabase([]byte(addressString))
-	// fmt.Println("iterator:", value)
-	// tokenValue, err := evmLogDb.customDb.Get([]byte(addressString))
-	// fmt.Println("Result in get account History", tokenValue, err)
-	// if err != nil{
-	// 	return "error"
-	// }
-	// fmt.Println("Account History", addressString, string(tokenValue))
-	// return string(tokenValue)
-	return "Nothing"
+	result := ""
+
+	fmt.Println("Enter get account History")
+	evmLogDb := tsfBackendAPI.evmLogDb
+	addressString := address.String()
+	prefix := addressString
+
+	ldbDatabase := evmLogDb.customDb.(*ethdb.LDBDatabase)
+	fmt.Println("Address to get history: ", addressString)
+	iter := ldbDatabase.NewIterator()
+	fmt.Println("iterator:", iter)
+
+	for ok := iter.Seek([]byte(prefix)); ok && strings.HasPrefix(string(iter.Key()), prefix); ok = iter.Next(){
+		key := iter.Key()
+		value := iter.Value()
+		fmt.Println("History", addressString, string(key), string(value))
+		result += string(key) + "||" + string(value) + "***"
+	}
+
+	if result != "" {
+		result = result[:len(result)-3]
+		return result
+	} else {
+		return "Nothing"
+	}
 }
