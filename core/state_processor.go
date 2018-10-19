@@ -73,6 +73,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	//=======================================================================
 	// add flag = true
+
 	p.bc.evmLogDb.StartWrite()
 	//=======================================================================
 	// Iterate over and process the individual transactions
@@ -88,8 +89,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		//=======================================================================
 		// get transaction index in block
 		fmt.Println("Set Tx Index for evmLog", i)
-		evmLogs := 	p.bc.evmLogDb.ReturnEVMLogs()	
-		evmLogs[len(evmLogs)-1].SetTxIndex(i)
+		evmLogs := 	p.bc.evmLogDb.ReturnEVMLogs()
+		if len(evmLogs) > 0 {
+			evmLogs[len(evmLogs)-1].SetTxIndex(i)
+		}	
 		//=======================================================================
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)

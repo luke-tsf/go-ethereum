@@ -56,3 +56,29 @@ func (tsfBackendAPI *TSFBackendAPI) GetAccountHistory(address common.Address) (s
 		return "Nothing"
 	}
 }
+
+func (tsfBackendAPI *TSFBackendAPI) GetTransactionHistory(transaction common.Hash) (string){
+	result := ""
+	fmt.Println("Enter get transaction History")
+	evmLogDb := tsfBackendAPI.evmLogDb
+	prefix := transaction.String()
+
+	ldbDatabase := evmLogDb.customDb.(*ethdb.LDBDatabase)
+	fmt.Println("transaction to get history: ", prefix)
+	iter := ldbDatabase.NewIterator()
+	fmt.Println("iterator:", iter)
+
+	for ok := iter.Seek([]byte(prefix)); ok && strings.HasPrefix(string(iter.Key()), prefix); ok = iter.Next(){
+		key := iter.Key()
+		value := iter.Value()
+		fmt.Println("History", prefix, string(key), string(value))
+		result += string(key) + "||" + string(value) + "***"
+	}
+
+	if result != "" {
+		result = result[:len(result)-3]
+		return result
+	} else {
+		return "Nothing"
+	}
+}

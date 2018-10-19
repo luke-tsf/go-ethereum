@@ -1328,7 +1328,21 @@ func MakeChainDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
 	}
 	return chainDb
 }
-
+//==============================================================================
+// Make custom database
+func MakeCustomDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
+	var (
+		cache   = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
+		handles = makeDatabaseHandles()
+	)
+	name := "cusomdata"
+	chainDb, err := stack.OpenDatabase(name, cache, handles)
+	if err != nil {
+		Fatalf("Could not open database: %v", err)
+	}
+	return chainDb
+}
+//==============================================================================
 func MakeGenesis(ctx *cli.Context) *core.Genesis {
 	var genesis *core.Genesis
 	switch {
@@ -1346,7 +1360,9 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb ethdb.Database) {
 	var err error
 	chainDb = MakeChainDatabase(ctx, stack)
-
+	//==============================================================================START
+	customDb := MakeCustomDatabase(ctx,stack)
+	//==============================================================================END
 	config, _, err := core.SetupGenesisBlock(chainDb, MakeGenesis(ctx))
 	if err != nil {
 		Fatalf("%v", err)
@@ -1380,6 +1396,9 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 	}
 	vmcfg := vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
 	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg)
+	//==============================================================================START
+	chain.CreateAndSetEVMLogDb(customDb)
+	//==============================================================================END
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

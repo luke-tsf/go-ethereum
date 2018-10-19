@@ -45,7 +45,9 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/hashicorp/golang-lru"
 
-	"github.com/ethereum/go-ethereum/blockparser"
+//==============================================================================
+	"github.com/ethereum/go-ethereum/blockparser"	
+//==============================================================================
 )
 
 var (
@@ -131,15 +133,16 @@ type BlockChain struct {
 	vmConfig  vm.Config
 
 	badBlocks *lru.Cache // Bad block cache
-//===============================================================================
+//===============================================================================START
 	evmLogDb	*blockparser.EVMLogDb
-//===============================================================================
+//===============================================================================END
 }
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
 func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+	// fmt.Println("Creating New Blockchain >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -199,7 +202,11 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	go bc.update()
 	return bc, nil
 }
-
+//===============================================================================
+func (bc *BlockChain) CreateAndSetEVMLogDb(customDb ethdb.Database){
+	bc.evmLogDb = blockparser.NewEVMLogDb(customDb)
+}
+//===============================================================================
 func (bc *BlockChain) getProcInterrupt() bool {
 	return atomic.LoadInt32(&bc.procInterrupt) == 1
 }
@@ -640,6 +647,14 @@ func (bc *BlockChain) GetUnclesInChain(block *types.Block, length int) []*types.
 		uncles = append(uncles, block.Uncles()...)
 		block = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	}
+	//===============================================================================START
+	for _,uncle := range uncles{
+		uncleBlock := types.NewBlockWithHeader(uncle)
+		txs := uncleBlock.Transactions()
+		// 2 -> uncle
+		bc.evmLogDb.MarkForkedOrUncleTransaction(txs, "2")
+	}
+	//===============================================================================END
 	return uncles
 }
 
@@ -1040,6 +1055,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 	// A queued approach to delivering events. This is generally
 	// faster than direct delivery and requires much less mutex
 	// acquiring.
+	// fmt.Println("Inserting chain - 1 ============================================")
 	var (
 		stats         = insertStats{startTime: mclock.Now()}
 		events        = make([]interface{}, 0, len(chain))
@@ -1059,10 +1075,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
 	senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number()), chain)
-
+	// fmt.Println("Inserting chain - 2 ============================================")
 	// Iterate over the blocks and insert when the verifier permits
 	for i, block := range chain {
 		// If the chain is terminating, stop processing blocks
+		// fmt.Println("Inserting chain - 3============================================")
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
 			log.Debug("Premature abort during blocks processing")
 			break
@@ -1154,6 +1171,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
+		// fmt.Println("Inserting chain - 4============================================")
 		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
@@ -1346,8 +1364,13 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
 		addedTxs = append(addedTxs, newChain[i].Transactions()...)
 	}
+
 	// calculate the difference between deleted and added transactions
 	diff := types.TxDifference(deletedTxs, addedTxs)
+	//===============================================================================START
+	// 1 -> forked
+	bc.evmLogDb.MarkForkedOrUncleTransaction(deletedTxs, "1")
+	//===============================================================================END
 	// When transactions get deleted from the database that means the
 	// receipts that were created in the fork must also be deleted
 	batch := bc.db.NewBatch()
@@ -1586,8 +1609,8 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
 }
 
-//===============================================================================
+//===============================================================================START
 func (bc *BlockChain) SetEVMLogDb(evmLogDb *blockparser.EVMLogDb) {
 	bc.evmLogDb = evmLogDb
 }
-//===============================================================================
+//===============================================================================END

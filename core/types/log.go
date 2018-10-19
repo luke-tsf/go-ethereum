@@ -54,7 +54,15 @@ type Log struct {
 	// You must pay attention to this field if you receive logs through a filter query.
 	Removed bool `json:"removed"`
 }
-
+/*[95 189 121 38 145 23 154 186 20 173 79 197 85 16 7 155 249 223 67 152] 
+	[] 
+	[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 153 153] 
+	31165 
+	[142 128 121 42 81 203 173 225 251 189 192 246 9 61 240 165 213 245 13 224 77 52 211 223 247 213 171 82 240 226 99 38] 
+	2 [91 241 49 94 114 158 161 62 105 41 103 44 32 200 22 115 117 165 194 220 226 149 154 238 135 159 54 231 219 180 203 242] 
+	4 
+	false
+*/
 type logMarshaling struct {
 	Data        hexutil.Bytes
 	BlockNumber hexutil.Uint64
