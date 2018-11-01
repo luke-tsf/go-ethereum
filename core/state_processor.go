@@ -126,18 +126,18 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 
-	//=======================================================================
+	//=======================================================================START
 	// ini evmLogDb for EVM
 	evmLogDb := bc.evmLogDb
 	vmenv.SetEVMLogDb(evmLogDb)
-	//=======================================================================
+	//=======================================================================END
 
 
 	// Apply the transaction to the current state (included in the env)
 	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
 
 
-	//=======================================================================
+	//=======================================================================START
 	// Get list of evmLogs after execution this transaction
 	// Newset log in list belongs to this transaction
 	fmt.Println("Write right in state processor: ",evmLogDb.IsWrite())
@@ -149,7 +149,7 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	if len(evmLogs) > 0 && err != nil && evmLogDb.IsWrite() == true {
 		evmLogs[len(evmLogs)-1].SetError(err)
 	}
-	//=======================================================================
+	//=======================================================================END
 	if err != nil {
 		return nil, 0, err
 	}
@@ -176,7 +176,7 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
-	//=======================================================================
+	//=======================================================================START
 	// get more information of current transaction for evm log
 	fmt.Println("Write right: ", evmLogDb.IsWrite())
 	if evmLogDb.IsWrite() == true {
@@ -189,6 +189,6 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 			fmt.Println("Newest Log in state processor: ", evmLogs[len(evmLogs)-1])	
 		}
 	}
-	//=======================================================================	
+	//=======================================================================END
 	return receipt, gas, err
 }

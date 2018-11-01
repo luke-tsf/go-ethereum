@@ -374,6 +374,7 @@ func (evmLogDb *EVMLogDb) MarkForkedOrUncleTransaction(txs types.Transactions, m
 			fmt.Println("Forked Transaction", string(valueTx), "old value:", string(value), "new value:", string(changedValue))
 		}
 	}
+	batch.Write()
 	return true
 }
 

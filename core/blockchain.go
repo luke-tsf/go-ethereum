@@ -1171,8 +1171,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		// fmt.Println("Inserting chain - 4============================================")
+		fmt.Println("Inserting chain - 4============================================")
 		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		fmt.Println("Inserting chain - 5============================================")
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
